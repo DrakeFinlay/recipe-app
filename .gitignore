@@ -1,0 +1,18 @@
+# Build and local tooling
+**/bin/
+**/obj/
+.vs/
+.tools/
+artifacts/
+TestResults/
+*.user
+*.suo
+
+# Local personal data and generated exports (conventional staging locations)
+/local-data/
+/private/
+/exports/
+*.pdf
+*.lnk
+.env
+.env.*
