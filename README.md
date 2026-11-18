@@ -22,6 +22,7 @@ MVP includes:
 - Alphabetical browsing, full-text search, and metadata filters.
 - Markdown editing and a readable preview.
 - Explicit movement between Favourites and To Try.
+- Manual times-cooked tracking with +1 and an editable total.
 - A favourites-only PDF with a cover, linked contents, page numbers, and a fresh
   page for each recipe.
 

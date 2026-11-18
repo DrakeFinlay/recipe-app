@@ -30,6 +30,7 @@ data format.
 | Storage | One unique recipe per Markdown file in an ordinary local library folder. |
 | Organization | Alphabetical recipe library, searched and filtered by metadata; no inherited chapter hierarchy. |
 | Collections | Favourites and To Try; membership changes only through an explicit user action. |
+| Times cooked | Manual non-negative whole-number count per recipe, with +1 and direct adjustment in MVP. |
 | Editing | Markdown editor for MVP; a form-based recipe editor is unnecessary. |
 | Initial migration | Preserve existing content, including incomplete `(add)` recipes and To add entries. |
 | PDF | Favourites only, light background, US Letter, cover, clickable contents, page numbers, each recipe starts on a fresh page. |
@@ -52,9 +53,10 @@ desktop UI, but do not build a server, web frontend, accounts, or sync for MVP.
 6. Read formatted recipes, including local images when available.
 7. Create and edit Markdown recipes with preview, save, and unsaved-change handling.
 8. Change collection membership explicitly through a visible control.
-9. Export the full Favourites collection to a local PDF and open its location for
-   manual upload to Google Drive.
-10. Handle external file edits, invalid metadata, missing images, and failed writes
+9. Track times cooked manually with a +1 button and an editable total.
+10. Export the full Favourites collection to a local PDF and open its location for
+    manual upload to Google Drive.
+11. Handle external file edits, invalid metadata, missing images, and failed writes
     without silently losing content or changing collection membership.
 
 ### Deferred
@@ -148,6 +150,7 @@ id: "27d00645-c645-42ae-b12e-b666df56a921"
 title: "Example chicken and rice"
 collection: to-try
 completeness: complete
+times_cooked: 0
 types: [main]
 proteins: [chicken]
 cuisines: []
@@ -184,6 +187,7 @@ Optional personal notes.
 | `title` | Display/search title; preserve native-language names and personal variants. |
 | `collection` | Exactly `favourites` or `to-try`. Only this field controls collection membership and export eligibility. |
 | `completeness` | `complete` or `placeholder`. Independent from collection: an approved favourite may still need transcription. |
+| `times_cooked` | Manual non-negative whole-number total. Defaults to `0` when absent; new and migrated recipes write `0`. It never controls collection membership. |
 | `types` | Optional list, such as main, side, soup, bread, dessert, drink, sauce, or seasoning. |
 | `proteins` | Optional list, such as chicken, beef, pork, seafood, tofu, egg, or legumes; empty is valid. |
 | `cuisines` | Optional cuisine/region list. Multiple values and unknown/empty values are valid. |
@@ -203,6 +207,12 @@ Recipe bodies remain flexible Markdown. Prefer Ingredients, Instructions, and
 Tips headings for new recipes, but accept imported Preparation headings, grouped
 ingredients, source links, and other useful notes. Preserve quantities as text;
 do not require a structured ingredient parser for MVP.
+
+Times cooked records only the user's supplied total. Zero initially means no
+cooks recorded in the app, not a claim that an existing favourite has never been
+cooked. Do not infer historical totals from favourites, notes, or completeness.
+Reject negative, fractional, non-numeric, or out-of-range values with a clear
+validation message; do not round, clamp, or silently reset them.
 
 ### Invalid and externally edited files
 
@@ -226,9 +236,10 @@ do not require a structured ingredient parser for MVP.
 ## 6. Collections and initial migration
 
 Collection membership is an explicit piece of recipe data. Cooking a recipe,
-editing it, completing its placeholder, or importing a photo must not promote it
-to Favourites. MVP uses a Favourites / To Try selector with an immediate Undo
-action. A later drag-and-drop interaction must call the same explicit operation.
+incrementing its count, editing it, completing its placeholder, or importing a
+photo must not promote it to Favourites. MVP uses a Favourites / To Try selector
+with an immediate Undo action. A later drag-and-drop interaction must call the
+same explicit operation.
 
 New manually created recipes default to To Try. The user can deliberately select
 Favourites during creation. An incomplete recipe can belong to either collection.
@@ -242,7 +253,9 @@ Favourites during creation. An incomplete recipe can belong to either collection
    ambiguous cases in the report rather than guessing from heading depth alone.
 3. Convert existing cookbook recipes to Favourites. Keep `(add)` in titles and
    preserve their existing bodies, including empty bodies; mark incomplete entries
-   as placeholders. Do not invent ingredients or instructions.
+   as placeholders. Initialize `times_cooked` to `0` for every migrated entry;
+   historical totals can be entered manually. Do not invent ingredients or
+   instructions.
 4. Convert individual To add items to favourite placeholders, preserving their
    URLs and attached personal notes exactly. When no title exists, use a readable
    provisional title derived from the URL or idea and flag it for review.
@@ -339,6 +352,26 @@ high-DPI scaling, and adjustable reading/editor font size. Destructive deletion
 is not needed for MVP; recipes can be removed through the library folder and
 the refreshed app must reflect this safely.
 
+### Track times cooked
+
+Show **Times cooked: N**, a **+1** button, and an **Adjust total** action in the
+selected recipe's header in reading mode. The controls work for both collections
+and for placeholders, independently of the Markdown editor.
+
+- +1 adds exactly one to the saved total and persists it immediately. Offer Undo
+  for an accidental increment; disable repeated activation while saving.
+- Adjust total opens a whole-number field with Save / Cancel. The user can
+  increase, decrease, or reset the total to zero. Editing `times_cooked` directly
+  in front matter follows the same validation rules.
+- Use the normal safe-save and external-change checks, preserving the recipe
+  body and other metadata. Resolve unsaved editor changes before either action.
+  A failed save leaves the displayed saved total and original file unchanged.
+- Persist the count in the recipe's Markdown so it survives restart, external
+  editing, and copying the library. A count change never moves the recipe or
+  changes its completeness.
+- Record only a total in MVP. Cooking dates, session history, calendars, and
+  automatic tracking are outside this feature's scope.
+
 ### Styling
 
 Use a dark neutral background, slightly elevated panels, readable off-white text,
@@ -391,7 +424,8 @@ generation. Export errors remain in the app and preserve the library.
 - Page numbers after the cover. Contents links and displayed page labels must
   agree, including when the contents itself spans multiple pages.
 - Preserve source notes and personal changes. Hide YAML, file paths, diagnostic
-  metadata, and the app's navigation from the printed recipe.
+  metadata, the times-cooked total, and the app's navigation from the printed
+  recipe.
 - Include favourite placeholders with their existing title/content and a small
   Incomplete recipe notice. Warn before export; do not silently omit them or
   manufacture missing steps. To Try entries remain excluded regardless of
@@ -496,10 +530,13 @@ phone unchanged.
 ### M2: Markdown authoring and explicit organization
 
 - Add creation, editing, preview, safe saves, recovery, refresh, and the collection
-  selector with Undo.
+  selector with Undo, plus the manual times-cooked controls.
 - Accept when recipes can be edited externally and in the app without silent
   overwrite; moves persist across restarts and never happen automatically.
 - Prove missing/invalid metadata cannot accidentally turn a recipe into a favourite.
+- Verify +1, Undo, direct total adjustment (including zero), validation, and
+  persistence after restart. Count updates preserve other content and collection
+  membership; failed/conflicting writes do not overwrite external changes.
 
 ### M3: Export and MVP release
 
@@ -516,9 +553,10 @@ phone unchanged.
 
 Focused automated checks should cover collection isolation, invalid metadata,
 save conflicts, filename collisions, migration idempotency, search/filter rules,
-and PDF scope/page references. Visually inspect desktop layout and representative
-PDF pages in addition to checking generated files programmatically. Use synthetic
-fixtures in Git; personal cookbook validation stays local.
+manual cooking-count updates/validation, and PDF scope/page references. Visually
+inspect desktop layout and representative PDF pages in addition to checking
+generated files programmatically. Use synthetic fixtures in Git; personal
+cookbook validation stays local.
 
 ## 11. Later milestones
 
